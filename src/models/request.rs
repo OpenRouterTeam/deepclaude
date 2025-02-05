@@ -6,6 +6,63 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Model {
+    #[serde(rename = "claude")]
+    Claude,
+    #[serde(rename = "deepseek")]
+    DeepSeek,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChatRequest {
+    pub model: Model,
+    pub messages: Vec<Message>,
+    #[serde(default = "default_temperature")]
+    pub temperature: f32,
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChatResponse {
+    pub message: Message,
+}
+
+impl Default for DeepSeekUsage {
+    fn default() -> Self {
+        Self {
+            input_tokens: 0,
+            output_tokens: 0,
+            reasoning_tokens: 0,
+            cached_input_tokens: 0,
+            total_tokens: 0,
+            total_cost: "$0.000".to_string(),
+        }
+    }
+}
+
+impl Default for AnthropicUsage {
+    fn default() -> Self {
+        Self {
+            input_tokens: 0,
+            output_tokens: 0,
+            cached_write_tokens: 0,
+            cached_read_tokens: 0,
+            total_tokens: 0,
+            total_cost: "$0.000".to_string(),
+        }
+    }
+}
+
+fn default_temperature() -> f32 {
+    0.7
+}
+
+fn default_max_tokens() -> u32 {
+    2048
+}
+
 /// Primary request structure for chat API endpoints.
 ///
 /// This structure represents a complete chat request, including messages,
@@ -26,6 +83,9 @@ pub struct ApiRequest {
     
     #[serde(default)]
     pub anthropic_config: ApiConfig,
+    
+    #[serde(default)]
+    pub openrouter_config: ApiConfig,
 }
 
 /// A single message in a chat conversation.
@@ -33,22 +93,14 @@ pub struct ApiRequest {
 /// Represents one message in the conversation history, including
 /// its role (system, user, or assistant) and content.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Message {
-    pub role: Role,
-    pub content: String,
+#[serde(untagged)]
+pub enum Message {
+    System(String),
+    User(String),
+    Assistant(String),
 }
 
-/// Possible roles for a message in a chat conversation.
-///
-/// Each message must be associated with one of these roles to
-/// properly structure the conversation flow.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    System,
-    User,
-    Assistant,
-}
+
 
 /// Configuration options for external API requests.
 ///

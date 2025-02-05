@@ -207,7 +207,47 @@ pub(crate) async fn chat(
     }
 
     // Extract API tokens
-    let (deepseek_token, anthropic_token) = extract_api_tokens(&headers)?;
+    let (deepseek_token, anthropic_token, openrouter_token) = extract_api_tokens(&headers, &state.config)?;
+
+    // Check for OpenRouter configuration
+    if let (Some(config), Some(token)) = (&state.config.openrouter, openrouter_token) {
+        let mut config = config.clone();
+        config.api_key = token;
+        let client = OpenRouterClient::new(&config)?;
+        
+        let chat_request = ChatRequest {
+            model: if request.get_system_prompt().is_some() {
+                Model::Claude
+            } else {
+                Model::DeepSeek
+            },
+            messages: request.get_messages_with_system().into_iter().map(|m| match m.role {
+                Role::System => Message::System(m.content),
+                Role::User => Message::User(m.content),
+                Role::Assistant => Message::Assistant(m.content),
+            }).collect(),
+            temperature: 0.7,
+            max_tokens: 2048,
+        };
+
+        let response = client.chat(chat_request).await?;
+        return Ok(Json(ApiResponse {
+            created: Utc::now(),
+            content: vec![ContentBlock::text(match response.message {
+                Message::Assistant(text) => text,
+                _ => return Err(ApiError::ExternalApi { 
+                    message: "Invalid response from OpenRouter".to_string() 
+                }),
+            })],
+            deepseek_response: None,
+            anthropic_response: None,
+            combined_usage: CombinedUsage {
+                total_cost: "$0.000".to_string(),
+                deepseek_usage: DeepSeekUsage::default(),
+                anthropic_usage: AnthropicUsage::default(),
+            },
+        }));
+    }
 
     // Initialize clients
     let deepseek_client = DeepSeekClient::new(deepseek_token);
@@ -346,7 +386,14 @@ pub(crate) async fn chat_stream(
     }
 
     // Extract API tokens
-    let (deepseek_token, anthropic_token) = extract_api_tokens(&headers)?;
+    let (deepseek_token, anthropic_token, openrouter_token) = extract_api_tokens(&headers, &state.config)?;
+
+    // Check for OpenRouter configuration
+    if let (Some(config), Some(token)) = (&state.config.openrouter, openrouter_token) {
+        return Err(ApiError::BadRequest {
+            message: "Streaming is not yet supported for OpenRouter".to_string()
+        });
+    }
 
     // Initialize clients
     let deepseek_client = DeepSeekClient::new(deepseek_token);

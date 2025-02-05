@@ -9,9 +9,11 @@
 
 pub mod anthropic;
 pub mod deepseek;
+pub mod openrouter;
 
 pub use anthropic::AnthropicClient;
 pub use deepseek::DeepSeekClient;
+pub use openrouter::OpenRouterClient;
 
 use crate::error::Result;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};

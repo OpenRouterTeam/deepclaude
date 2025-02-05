@@ -15,6 +15,7 @@ use std::path::Path;
 pub struct Config {
     pub server: ServerConfig,
     pub pricing: PricingConfig,
+    pub openrouter: Option<OpenRouterConfig>,
 }
 
 /// Server-specific configuration settings.
@@ -35,6 +36,7 @@ pub struct ServerConfig {
 pub struct PricingConfig {
     pub deepseek: DeepSeekPricing,
     pub anthropic: AnthropicPricing,
+    pub openrouter: OpenRouterPricing,
 }
 
 /// DeepSeek-specific pricing configuration.
@@ -69,6 +71,19 @@ pub struct ModelPricing {
     pub output_price: f64,            // per million tokens
     pub cache_write_price: f64,       // per million tokens
     pub cache_read_price: f64,        // per million tokens
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OpenRouterConfig {
+    pub api_key: String,
+    pub site_url: Option<String>,
+    pub site_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OpenRouterPricing {
+    pub claude: ModelPricing,
+    pub deepseek: ModelPricing,
 }
 
 impl Config {
@@ -134,7 +149,22 @@ impl Default for Config {
                         cache_read_price: 1.50,
                     },
                 },
+                openrouter: OpenRouterPricing {
+                    claude: ModelPricing {
+                        input_price: 15.0,
+                        output_price: 75.0,
+                        cache_write_price: 18.75,
+                        cache_read_price: 1.50,
+                    },
+                    deepseek: ModelPricing {
+                        input_price: 0.55,
+                        output_price: 2.19,
+                        cache_write_price: 0.69,
+                        cache_read_price: 0.14,
+                    },
+                },
             },
+            openrouter: None,
         }
     }
 }
