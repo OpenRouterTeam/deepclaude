@@ -48,7 +48,8 @@ pub struct AppState {
 /// Returns `ApiError::BadRequest` if tokens are malformed
 fn extract_api_tokens(
     headers: &axum::http::HeaderMap,
-) -> Result<(String, String)> {
+    config: &Config,
+) -> Result<(String, String, Option<String>)> {
     let deepseek_token = headers
         .get("X-DeepSeek-API-Token")
         .ok_or_else(|| ApiError::MissingHeader { 
@@ -71,7 +72,23 @@ fn extract_api_tokens(
         })?
         .to_string();
 
-    Ok((deepseek_token, anthropic_token))
+    let openrouter_token = if config.openrouter.is_some() {
+        headers
+            .get("X-OpenRouter-API-Token")
+            .map(|token| {
+                token
+                    .to_str()
+                    .map_err(|_| ApiError::BadRequest {
+                        message: "Invalid OpenRouter API token".to_string(),
+                    })
+                    .map(|s| s.to_string())
+            })
+            .transpose()?
+    } else {
+        None
+    };
+
+    Ok((deepseek_token, anthropic_token, openrouter_token))
 }
 
 /// Calculates the cost of DeepSeek API usage.
@@ -221,10 +238,10 @@ pub(crate) async fn chat(
             } else {
                 Model::DeepSeek
             },
-            messages: request.get_messages_with_system().into_iter().map(|m| match m.role {
-                Role::System => Message::System(m.content),
-                Role::User => Message::User(m.content),
-                Role::Assistant => Message::Assistant(m.content),
+            messages: request.get_messages_with_system().into_iter().map(|m| match m {
+                Message { role: Role::System, content } => Message::System(content),
+                Message { role: Role::User, content } => Message::User(content),
+                Message { role: Role::Assistant, content } => Message::Assistant(content),
             }).collect(),
             temperature: 0.7,
             max_tokens: 2048,
